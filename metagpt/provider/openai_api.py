@@ -10,7 +10,13 @@ from typing import NamedTuple
 
 import openai
 from openai.error import APIConnectionError
-from tenacity import retry, stop_after_attempt, after_log, wait_fixed, retry_if_exception_type
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    after_log,
+    wait_fixed,
+    retry_if_exception_type,
+)
 
 from metagpt.config import CONFIG
 from metagpt.logs import logger
@@ -76,7 +82,10 @@ class CostManager(metaclass=Singleton):
         """
         self.total_prompt_tokens += prompt_tokens
         self.total_completion_tokens += completion_tokens
-        cost = (prompt_tokens * TOKEN_COSTS[model]["prompt"] + completion_tokens * TOKEN_COSTS[model]["completion"]) / 1000
+        cost = (
+            prompt_tokens * TOKEN_COSTS[model]["prompt"]
+            + completion_tokens * TOKEN_COSTS[model]["completion"]
+        ) / 1000
         self.total_cost += cost
         logger.info(
             f"Total running cost: ${self.total_cost:.3f} | Max budget: ${CONFIG.max_budget:.3f} | "
@@ -113,15 +122,24 @@ class CostManager(metaclass=Singleton):
 
     def get_costs(self) -> Costs:
         """获得所有开销"""
-        return Costs(self.total_prompt_tokens, self.total_completion_tokens, self.total_cost, self.total_budget)
+        return Costs(
+            self.total_prompt_tokens,
+            self.total_completion_tokens,
+            self.total_cost,
+            self.total_budget,
+        )
 
 
 def log_and_reraise(retry_state):
-    logger.error(f"Retry attempts exhausted. Last exception: {retry_state.outcome.exception()}")
-    logger.warning("""
+    logger.error(
+        f"Retry attempts exhausted. Last exception: {retry_state.outcome.exception()}"
+    )
+    logger.warning(
+        """
 Recommend going to https://deepwisdom.feishu.cn/wiki/MsGnwQBjiif9c3koSJNcYaoSnu4#part-XdatdVlhEojeAfxaaEZcMV3ZniQ
 See FAQ 5.8
-""")
+"""
+    )
     raise retry_state.outcome.exception()
 
 
@@ -148,7 +166,9 @@ class OpenAIGPTAPI(BaseGPTAPI, RateLimiter):
         self.rpm = int(config.get("RPM", 10))
 
     async def _achat_completion_stream(self, messages: list[dict]) -> str:
-        response = await openai.ChatCompletion.acreate(**self._cons_kwargs(messages), stream=True)
+        response = await openai.ChatCompletion.acreate(
+            **self._cons_kwargs(messages), stream=True
+        )
 
         # create variables to collect the stream of chunks
         collected_chunks = []
@@ -199,6 +219,10 @@ class OpenAIGPTAPI(BaseGPTAPI, RateLimiter):
         self._update_costs(rsp)
         return rsp
 
+    def generate_image(self, prompt: str) -> dict:
+        logger.info(f"prompt: {prompt}")
+        return self.llm.Image.create(model="dall-e-3", prompt=prompt, n=1)
+
     def completion(self, messages: list[dict]) -> dict:
         # if isinstance(messages[0], Message):
         #     messages = self.messages_to_dict(messages)
@@ -212,7 +236,7 @@ class OpenAIGPTAPI(BaseGPTAPI, RateLimiter):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_fixed(1),
-        after=after_log(logger, logger.level('WARNING').name),
+        after=after_log(logger, logger.level("WARNING").name),
         retry=retry_if_exception_type(APIConnectionError),
         retry_error_callback=log_and_reraise,
     )
@@ -229,8 +253,8 @@ class OpenAIGPTAPI(BaseGPTAPI, RateLimiter):
             try:
                 prompt_tokens = count_message_tokens(messages, self.model)
                 completion_tokens = count_string_tokens(rsp, self.model)
-                usage['prompt_tokens'] = prompt_tokens
-                usage['completion_tokens'] = completion_tokens
+                usage["prompt_tokens"] = prompt_tokens
+                usage["completion_tokens"] = completion_tokens
                 return usage
             except Exception as e:
                 logger.error("usage calculation failed!", e)
@@ -266,9 +290,11 @@ class OpenAIGPTAPI(BaseGPTAPI, RateLimiter):
     def _update_costs(self, usage: dict):
         if CONFIG.calc_usage:
             try:
-                prompt_tokens = int(usage['prompt_tokens'])
-                completion_tokens = int(usage['completion_tokens'])
-                self._cost_manager.update_cost(prompt_tokens, completion_tokens, self.model)
+                prompt_tokens = int(usage["prompt_tokens"])
+                completion_tokens = int(usage["completion_tokens"])
+                self._cost_manager.update_cost(
+                    prompt_tokens, completion_tokens, self.model
+                )
             except Exception as e:
                 logger.error("updating costs failed!", e)
 

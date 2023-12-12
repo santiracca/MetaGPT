@@ -10,10 +10,10 @@ from metagpt.actions import WriteDesign, WritePRD
 from metagpt.roles import Role
 
 
-class Architect(Role):
-    """Architect: Listen to PRD, responsible for designing API, designing code files"""
-    def __init__(self, name="Bob", profile="Architect", goal="Design a concise, usable, complete python system",
-                 constraints="Try to specify good open source tools as much as possible"):
+class CampaignStrategist(Role):
+    """CampaignStrategist: Listen to PRD, responsible for designing a marketing campaign. """
+    def __init__(self, name="Manu", profile="Campaign Strategist", goal="Develop the overarching strategy for marketing campaigns, guided by inputs from the PRD",
+                 constraints="Align with the client's goals and budget but also effectively leverage various marketing channels and insights derived from market research and consumer behavior analysis."):
         super().__init__(name, profile, goal, constraints)
         self._init_actions([WriteDesign])
         self._watch({WritePRD})

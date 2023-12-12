@@ -16,10 +16,9 @@ from metagpt.schema import Message
 from metagpt.utils.common import NoMoneyException
 
 
-class SoftwareCompany(BaseModel):
+class MarketingAgency(BaseModel):
     """
-    Software Company: Possesses a team, SOP (Standard Operating Procedures), and a platform for instant messaging,
-    dedicated to writing executable code.
+    Digital Marketing Agency: Possesses a team, SOP (Standard Operating Procedures), and a platform for instant messaging, dedicated to creating and managing digital marketing campaigns.
     """
     environment: Environment = Field(default_factory=Environment)
     investment: float = Field(default=10.0)

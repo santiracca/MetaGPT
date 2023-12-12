@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 @Time    : 2023/5/11 17:45
 @Author  : alexanderwu
@@ -10,6 +8,9 @@ from typing import List, Tuple
 from metagpt.actions import Action, ActionOutput
 from metagpt.actions.search_and_summarize import SearchAndSummarize
 from metagpt.logs import logger
+from metagpt.const import WORKSPACE_ROOT
+from metagpt.utils.common import CodeParser
+from metagpt.utils.mermaid import mermaid_to_file
 
 PROMPT_TEMPLATE = """
 # Context
@@ -19,7 +20,7 @@ PROMPT_TEMPLATE = """
 ## Search Information
 {search_information}
 
-## mermaid quadrantChart code syntax example. DONT USE QUOTO IN CODE DUE TO INVALID SYNTAX. Replace the <Campain X> with REAL COMPETITOR NAME
+## mermaid quadrantChart code syntax example. DONT USE QUOTE IN CODE DUE TO INVALID SYNTAX. Replace the <Campain X> with REAL COMPETITOR NAME
 ```mermaid
 quadrantChart
     title Reach and engagement of campaigns
@@ -41,88 +42,83 @@ quadrantChart
 ## Format example
 {format_example}
 -----
-Role: You are a professional product manager; the goal is to design a concise, usable, efficient product
-Requirements: According to the context, fill in the following missing information, note that each sections are returned in Python code triple quote form seperatedly. If the requirements are unclear, ensure minimum viability and avoid excessive design
-ATTENTION: Use '##' to SPLIT SECTIONS, not '#'. AND '## <SECTION_NAME>' SHOULD WRITE BEFORE the code and triple quote. Output carefully referenced "Format example" in format.
+Role: As an Account Executive Agent in an autonomous digital marketing agency, your primary role is to act as the main point of contact between the client and the agency. Your responsibilities encompass understanding and translating client requirements into actionable marketing strategies, coordinating with specialized agents, and ensuring the successful execution and monitoring of marketing campaigns. Your aim is to provide seamless, effective communication and project management while aligning all marketing activities with the client's goals.
+Requirements: According to the context, fill in the following missing information. If the requirements are unclear, ensure minimum viability and avoid excessive design
+ATTENTION: Use '##' to SPLIT SECTIONS, not '#'. AND '## <SECTION_NAME>'. Output carefully referenced "Format example" in format.
 
 ## Original Requirements: Provide as Plain text, place the polished complete original requirements here
 
-## Product Goals: Provided as Python list[str], up to 3 clear, orthogonal product goals. If the requirement itself is simple, the goal should also be simple
+## Campaign Goals: Provided as list of markdown bulletpoints, up to 3 clear, orthogonal campaign goals. If the requirement itself is simple, the goal should also be simple
 
-## User Stories: Provided as Python list[str], up to 5 scenario-based user stories, If the requirement itself is simple, the user stories should also be less
+## Target Market Call-to-Action goals: Provided as markdown bullet points, up to 5 scenario-based call-to-action, If the requirement itself is simple, the call-to-action should also be less
 
-## Competitive Analysis: Provided as Python list[str], up to 7 competitive product analyses, consider as similar competitors as possible
+## Competitive Analysis: Provided list of markdown bulletpoints, up to 7 competitive product analyses, consider as similar competitors as possible
 
-## Competitive Quadrant Chart: Use mermaid quadrantChart code syntax. up to 14 competitive products. Translation: Distribute these competitor scores evenly between 0 and 1, trying to conform to a normal distribution centered around 0.5 as much as possible.
+## Competitive Quadrant Chart: Use mermaid quadrantChart code syntax. up to 14 competitive products. Distribute these competitor scores evenly between 0 and 1, trying to conform to a normal distribution centered around 0.5 as much as possible.
 
 ## Requirement Analysis: Provide as Plain text. Be simple. LESS IS MORE. Make your requirements less dumb. Delete the parts unnessasery.
 
-## Requirement Pool: Provided as Python list[str, str], the parameters are requirement description, priority(P0/P1/P2), respectively, comply with PEP standards; no more than 5 requirements and consider to make its difficulty lower
+## Requirement Pool: Provided as list of markdown bulletpoints, the parameters are requirement description, priority(P0/P1/P2), respectively, comply with PEP standards; no more than 5 requirements and consider to make its difficulty lower
 
-## UI Design draft: Provide as Plain text. Be simple. Describe the elements and functions, also provide a simple style description and layout description.
 ## Anything UNCLEAR: Provide as Plain text. Make clear here.
+
+## Additional Information Required: Provided as markdown bullet points, up to 5 pieces of additional information needed from the client to help you deliver better results. ONLY IF YOU NEED MORE INFORMATION.
 """
 FORMAT_EXAMPLE = """
 ---
 ## Original Requirements
 The boss ... 
 
-## Product Goals
-```python
-[
-    "Create a ...",
-]
-```
+## Campaign Goals
 
-## User Stories
-```python
-[
-    "As a user, ...",
-]
-```
+-  Create a ...
+-  Increase ...
+
+## Target Market Call-to-Action goals
+
+- I want my customers to ...
+- I want my customers to ...
 
 ## Competitive Analysis
-```python
-[
-    "Python Snake Game: ...",
-]
-```
+
+- Competitor: ...
 
 ## Competitive Quadrant Chart
 ```mermaid
 quadrantChart
     title Reach and engagement of campaigns
     ...
-    "Our Target Product": [0.6, 0.7]
+    "Our Target Campaign": [0.6, 0.7]
 ```
 
 ## Requirement Analysis
 The product should be a ...
 
 ## Requirement Pool
-```python
-[
-    ("End game ...", "P0")
-]
-```
+| Requirement | Priority | 
+| -------- | -------- |
+| Campaign requirement   | P0  | 
+| Campaign requirement   | P1  |
 
-## UI Design draft
-Give a basic function description, and a draft
+
 
 ## Anything UNCLEAR
 There are no unclear points.
+
+## Additional Information Required.
+- I want to know ...
 ---
 """
 OUTPUT_MAPPING = {
     "Original Requirements": (str, ...),
-    "Product Goals": (List[str], ...),
-    "User Stories": (List[str], ...),
-    "Competitive Analysis": (List[str], ...),
+    "Campaign Goals": (str, ...),
+    "Target Market Call-to-Action goals": (str, ...),
+    "Competitive Analysis": (str, ...),
     "Competitive Quadrant Chart": (str, ...),
     "Requirement Analysis": (str, ...),
-    "Requirement Pool": (List[Tuple[str, str]], ...),
-    "UI Design draft":(str, ...),
+    "Requirement Pool": (str, ...),
     "Anything UNCLEAR": (str, ...),
+    "Additional Information Required": (str, ...),
 }
 
 
@@ -139,8 +135,17 @@ class WritePRD(Action):
             logger.info(sas.result)
             logger.info(rsp)
 
-        prompt = PROMPT_TEMPLATE.format(requirements=requirements, search_information=info,
-                                        format_example=FORMAT_EXAMPLE)
+        prompt = PROMPT_TEMPLATE.format(
+            requirements=requirements,
+            search_information=info,
+            format_example=FORMAT_EXAMPLE,
+        )
         logger.debug(prompt)
         prd = await self._aask_v1(prompt, "prd", OUTPUT_MAPPING)
+        file_path = WORKSPACE_ROOT / "prd.md"
+        file_path.write_text(prd.content)
+        quadrant_chart = CodeParser.parse_code(
+            block="Competitive Quadrant Chart", text=prd.content
+        )
+        mermaid_to_file(quadrant_chart, WORKSPACE_ROOT / "competitive_analysis")
         return prd

@@ -23,6 +23,7 @@ from metagpt.actions.write_code_review import WriteCodeReview
 from metagpt.actions.write_prd import WritePRD
 from metagpt.actions.write_prd_review import WritePRDReview
 from metagpt.actions.write_test import WriteTest
+from metagpt.actions.generate_image import GeneratePostImage
 
 
 class ActionType(Enum):
@@ -45,6 +46,7 @@ class ActionType(Enum):
     COLLECT_LINKS = CollectLinks
     WEB_BROWSE_AND_SUMMARIZE = WebBrowseAndSummarize
     CONDUCT_RESEARCH = ConductResearch
+    GENERATE_POST_IMAGE = GeneratePostImage
 
 
 __all__ = [
