@@ -3,6 +3,47 @@
 import asyncio
 import platform
 import fire
+from flask import Flask, request, Response, send_file
+from threading import Thread
+import zipfile
+import os
+
+
+app = Flask(__name__)
+
+
+@app.route("/agentC", methods=["POST"])
+def agentC():
+    data = request.get_json()
+    idea = data.get("idea")
+    investment = data.get("investment", 3.0)
+    n_round = data.get("n_round", 5)
+    code_review = data.get("code_review", False)
+    run_tests = data.get("run_tests", False)
+
+    def run_project():
+        if platform.system() == "Windows":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        yield "Starting agentC...\n"
+        Thread(
+            target=asyncio.run,
+            args=(startup(idea, investment, n_round, code_review, run_tests),),
+        ).start()
+        yield "Done.\n"
+
+    return Response(run_project(), mimetype="text/plain")
+
+
+@app.route("/files", methods=["GET"])
+def files():
+    # Create a zip file
+    with zipfile.ZipFile("files.zip", "w") as zipf:
+        for file in os.listdir("./workspace"):
+            zipf.write(f"./workspace/{file}")
+
+    # Send the zip file
+    return send_file("files.zip", as_attachment=True)
+
 
 from metagpt.roles import (
     CampaignStrategist,
@@ -58,4 +99,4 @@ def main(
 
 
 if __name__ == "__main__":
-    fire.Fire(main)
+    app.run(debug=True)
